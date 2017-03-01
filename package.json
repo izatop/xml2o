@@ -1,7 +1,7 @@
 {
   "name": "xml2o",
   "version": "0.1.1",
-  "description": "SAX based XML to Object converter",
+  "description": "Convert your XML documents to SimpleXML-like objects",
   "main": "index.js",
   "scripts": {
     "test": "tape -r source-map-support/register index.spec.js",

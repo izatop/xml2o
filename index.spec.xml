@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Thing bool="true" type="thing">
+    Text
+    <TextNodeTest>
+        Hello, Bob!
+    </TextNodeTest>
+    <TextNodeInnerTest>
+        Hello, <hidden>inner</hidden> Bob!
+    </TextNodeInnerTest>
+    <CDataNodeTest>
+        <![CDATA[
+            &quot;CData&quot; may <b>contain</b> html tags and entities.
+        ]]>
+    </CDataNodeTest>
+    <ListTest>
+        <Foo id="1" />
+        <Foo id="2" />
+        <Foo id="3" />
+    </ListTest>
+</Thing>

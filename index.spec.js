@@ -1,0 +1,53 @@
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const path_1 = require("path");
+const fs_1 = require("fs");
+const index_1 = require("./index");
+const test = require("tape");
+const index_2 = require("./node/index");
+const testXMLFile = path_1.join(__dirname, './index.spec.xml');
+const trim = (t) => t.replace(/(^\s*|\s*$)/g, '');
+test('Convert string', (assert) => __awaiter(this, void 0, void 0, function* () {
+    assert.plan(3);
+    const node = yield index_1.convertString(fs_1.readFileSync(testXMLFile, 'UTF-8'));
+    assert.ok(node instanceof index_2.Node);
+    assert.ok(node[0] instanceof index_2.Node);
+    assert.equal(node.length, 4);
+}));
+test('Convert stream', (assert) => __awaiter(this, void 0, void 0, function* () {
+    assert.plan(3);
+    const node = yield index_1.convertStream(fs_1.createReadStream(testXMLFile));
+    assert.ok(node instanceof index_2.Node);
+    assert.ok(node[0] instanceof index_2.Node);
+    assert.equal(node.length, 4);
+}));
+test('Query', (assert) => __awaiter(this, void 0, void 0, function* () {
+    assert.plan(2);
+    const node = yield index_1.convertStream(fs_1.createReadStream(testXMLFile));
+    assert.equal(node.query('Foo').length, 3);
+    assert.equal(node.query('ListTest')[0].query('Foo').length, 3);
+}));
+test('Text', (assert) => __awaiter(this, void 0, void 0, function* () {
+    assert.plan(2);
+    const node = yield index_1.convertStream(fs_1.createReadStream(testXMLFile));
+    assert.equal(trim(node.query('TextNodeTest')[0].text), 'Hello, Bob!');
+    assert.equal(trim(node.query('TextNodeInnerTest')[0].text), 'Hello, inner Bob!');
+}));
+test('Attributes', (assert) => __awaiter(this, void 0, void 0, function* () {
+    assert.plan(5);
+    const node = yield index_1.convertStream(fs_1.createReadStream(testXMLFile));
+    assert.ok(node.query('Foo')[0].getAttributeNode('id') instanceof index_2.Attribute);
+    assert.equal(node.query('Foo')[0].getAttribute('id'), "1");
+    assert.equal(node.query('Foo')[1].getAttribute('id'), "2");
+    assert.equal(node.query('Foo')[2].getAttribute('id'), "3");
+    assert.same(node.getAttributes(), { type: 'thing', bool: 'true' });
+}));
+//# sourceMappingURL=index.spec.js.map

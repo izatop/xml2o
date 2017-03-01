@@ -1,0 +1,34 @@
+{
+  "name": "xml2o",
+  "version": "0.1.1",
+  "description": "SAX based XML to Object converter",
+  "main": "index.js",
+  "scripts": {
+    "test": "tape -r source-map-support/register index.spec.js",
+    "preversion": "tsc && npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/izatop/xml2o.git"
+  },
+  "keywords": [
+    "xml"
+  ],
+  "author": "izatop@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/izatop/xml2o/issues"
+  },
+  "homepage": "https://github.com/izatop/xml2o#readme",
+  "devDependencies": {
+    "@types/tape": "^4.2.29",
+    "source-map-support": "^0.4.11",
+    "tape": "^4.6.3",
+    "typescript": "^2.2.1"
+  },
+  "dependencies": {
+    "@types/node": "^7.0.5",
+    "@types/sax": "^1.0.0",
+    "sax": "^1.2.2"
+  }
+}

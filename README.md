@@ -78,7 +78,7 @@ console.log(...list);
 
 #### Node Properties
 
-| | |
+| Property | Description |
 |---|---|
 | `name`         | Tag name
 | `local`        | Tag local name
@@ -89,7 +89,7 @@ console.log(...list);
 
 #### Node Methods
 
-| | | |
+| Method | Arguments | Description |
 |---|---|---|
 | `getAttribute`    | `name, uri?`  | Returns an attribute value
 | `getAttributeNode`| `name, uri?`  | Returns an attribute

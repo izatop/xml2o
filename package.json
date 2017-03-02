@@ -1,6 +1,6 @@
 {
   "name": "xml2o",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Convert your XML documents to SimpleXML-like objects",
   "main": "index.js",
   "scripts": {

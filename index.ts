@@ -1,5 +1,4 @@
 import * as SAX from 'sax';
-import {Stream} from 'stream';
 import {Node} from './node';
 import ReadableStream = NodeJS.ReadableStream;
 

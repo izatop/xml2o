@@ -71,9 +71,13 @@ console.log(
 
 **Node children**
 ```typescript
+console.log(...node.map(child => child.name));
+```
+
+**Node query**
+```typescript
 const [list] = node.query('list');
 console.log(...list);
-
 ```
 
 #### Node Properties

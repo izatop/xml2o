@@ -1,34 +1,35 @@
-# Install
+# xml2o
 
-Just run `npm i -S xml2o`
+Helps you convert XML into an object for easy reading.
 
-# Usage
+## Getting Started
 
-Convert XML from stream:
+Install the package:
+
+```bash
+npm i -S xml2o
+```
+
+Let's convert XML from stream:
 
 ```typescript
 import {convertStream} from 'xml2o';
 import {createReadStream} from 'fs';
 
 const node = convertStream(createReadStream('/path/to/file.xml'));
-// ...
-
 ```
 
-Convert XML from string:
+We can doing same with string:
 
 ```typescript
 import {convertString} from 'xml2o';
 
 const node = convertString('<node><foo bar="bar">foo</foo></node>');
-// ...
-
 ```
 
-## Node
+## Examples
 
-A node is a SimpleXML-like object which have some properties and methods
-to help you read XML structures.
+A SimpleXML-like Node object made to help you read XML structures in JS without DOM.
 
 **Check a node**
 
@@ -98,26 +99,36 @@ console.log(node.query('/d/c')); // found /node/d/c
 console.log(node.query('b/a')); // found /node/b/a
 ```
 
-### Node Properties
+## Documentation
+
+| Method | Arguments | Return | Description |
+|---|---|---|---|
+| convertString | `XMLString` | `Node` | XML string
+| convertStream | `stream`    | `Node` | Readable stream
+
+### Node
+
+Node class used to present XML nodes as objects. Every Node object has following properties and methods:
+
+**Properties**
 
 | Property | Description |
 |---|---|
 | `name`         | Tag name
 | `local`        | Tag local name
 | `prefix`       | Tag prefix
-| `attributes`  |  don't use if you don't known what you do | 
-| `parent`      |  Parent Node
-| `root`        |  Root Node
+| `parent`       | Parent Node
+| `root`         | Root Node
 
-### Node Methods
+**Methods**
 
-| Method | Arguments | Description |
-|---|---|---|
-| `getAttribute`    | `name, uri?`  | Returns an attribute value
-| `getAttributeNode`| `name, uri?`  | Returns an attribute
-| `getAttributes`   |               | Returns an array of attributes values
-| `hasAttribute`    | `name, uri?`  | Returns true if an attribute is exists 
-| `query`           | `name, uri?`  | Returns matched nodes in any level
+| Method | Arguments | Return | Description |
+|---|---|---|---|
+| `getAttribute`    | `name, uri?` | `string`           | Returns an attribute value
+| `getAttributeNode`| `name, uri?` | `Attribute`        | Returns an attribute
+| `getAttributes`   |              | `Array<string>`    | Returns an array of attributes values
+| `hasAttribute`    | `name, uri?` | `boolean`          | Returns true if an attribute is exists 
+| `query`           | `name, uri?` | `Array<Node>`      | Returns matched nodes in any level
 
 # Note
 Code examples written with modules so you may need babel, typescript or other to run its or rewrite ES6 imports to: 

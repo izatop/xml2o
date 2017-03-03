@@ -3,24 +3,25 @@ import * as SAX from 'sax';
 const text = Symbol();
 
 export class Node extends Array {
-    readonly name: string;
-    readonly local: string;
-    readonly prefix: string;
-    readonly uri: string;
-
-    readonly attributes: {[key: string]: Attribute};
-
+    public readonly name: string;
+    public readonly local: string;
+    public readonly path: string;
+    public readonly prefix: string;
+    public readonly uri: string;
+    
+    protected readonly attributes: {[key: string]: Attribute};
+    
     constructor(opt: SAX.QualifiedTag, public parent: Node | null) {
         super();
-        this.prefix = opt.prefix;
-        this.local = opt.local;
         this.name = opt.name;
+        this.local = opt.local;
+        this.prefix = opt.prefix;
         this.uri = opt.uri || '';
-
+    
         this.attributes = Object.assign({}, ...Object.keys(opt.attributes).map(key => ({[key]: new Attribute(opt.attributes[key])})));
         this[text] = [];
     }
-
+    
     static pushText(node, value) {
         node[text].push(value);
         if (node.parent) {
@@ -76,16 +77,35 @@ export class Node extends Array {
         return this[text].join('');
     }
 
-    query(name: string, uri?: string): Node[] {
+    query(path: string, uri?: string): Node[] {
         const result = [];
-        for (const node of this) {
-            if (node.name === name) {
-                result.push(node);
-            }
-
-            result.push(...node.query(name));
+        const searchUri = uri || '';
+        let match: {(node: Node): Node[]};
+        
+        if (path === '/') {
+            return [this];
         }
-
+        
+        if (0 === path.indexOf('/')) {
+            const parts = path.split('/').slice(1);
+            if (parts.length === 1) {
+                match = (node) => parts[0] === node.local && searchUri === node.uri ? [node] : [];
+            } else if (parts.length > 1) {
+                match = (node) => parts[0] === node.local ? [...node.query('/'.concat(parts.slice(1).join('/')), uri)] : [];
+            } else {
+                return [];
+            }
+        } else if (-1 !== path.indexOf('/')) {
+            const parts = path.split('/');
+            match = (node) => parts[0] === node.local ? [...node.query(parts.slice(1).join('/'), uri)] : [...node.query(path, uri)];
+        } else {
+            match = (node) => path === node.local && searchUri === node.uri ? [node, ...node.query(path, uri)] : [...node.query(path, uri)];
+        }
+    
+        for (const node of this) {
+            result.push(...match(node));
+        }
+        
         return result;
     }
 }

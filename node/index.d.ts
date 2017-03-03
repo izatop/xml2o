@@ -3,9 +3,10 @@ export declare class Node extends Array {
     parent: Node | null;
     readonly name: string;
     readonly local: string;
+    readonly path: string;
     readonly prefix: string;
     readonly uri: string;
-    readonly attributes: {
+    protected readonly attributes: {
         [key: string]: Attribute;
     };
     constructor(opt: SAX.QualifiedTag, parent: Node | null);
@@ -17,7 +18,7 @@ export declare class Node extends Array {
     hasAttribute(name: string, uri?: string): boolean;
     readonly root: any;
     readonly text: any;
-    query(name: string, uri?: string): Node[];
+    query(path: string, uri?: string): Node[];
 }
 export declare class Attribute {
     readonly name: string;

@@ -5,9 +5,9 @@ class Node extends Array {
     constructor(opt, parent) {
         super();
         this.parent = parent;
-        this.prefix = opt.prefix;
-        this.local = opt.local;
         this.name = opt.name;
+        this.local = opt.local;
+        this.prefix = opt.prefix;
         this.uri = opt.uri || '';
         this.attributes = Object.assign({}, ...Object.keys(opt.attributes).map(key => ({ [key]: new Attribute(opt.attributes[key]) })));
         this[text] = [];
@@ -56,13 +56,34 @@ class Node extends Array {
     get text() {
         return this[text].join('');
     }
-    query(name, uri) {
+    query(path, uri) {
         const result = [];
-        for (const node of this) {
-            if (node.name === name) {
-                result.push(node);
+        const searchUri = uri || '';
+        let match;
+        if (path === '/') {
+            return [this];
+        }
+        if (0 === path.indexOf('/')) {
+            const parts = path.split('/').slice(1);
+            if (parts.length === 1) {
+                match = (node) => parts[0] === node.local && searchUri === node.uri ? [node] : [];
             }
-            result.push(...node.query(name));
+            else if (parts.length > 1) {
+                match = (node) => parts[0] === node.local ? [...node.query('/'.concat(parts.slice(1).join('/')), uri)] : [];
+            }
+            else {
+                return [];
+            }
+        }
+        else if (-1 !== path.indexOf('/')) {
+            const parts = path.split('/');
+            match = (node) => parts[0] === node.local ? [...node.query(parts.slice(1).join('/'), uri)] : [...node.query(path, uri)];
+        }
+        else {
+            match = (node) => path === node.local && searchUri === node.uri ? [node, ...node.query(path, uri)] : [...node.query(path, uri)];
+        }
+        for (const node of this) {
+            result.push(...match(node));
         }
         return result;
     }

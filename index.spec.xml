@@ -17,4 +17,13 @@
         <Foo id="2" />
         <Foo id="3" />
     </ListTest>
+    <QueryTest>
+        <A />
+        <A />
+        <B>
+            <C />
+            <C />
+            <A />
+        </B>
+    </QueryTest>
 </Thing>

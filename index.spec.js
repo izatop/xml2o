@@ -20,20 +20,26 @@ test('Convert string', (assert) => __awaiter(this, void 0, void 0, function* () 
     const node = yield index_1.convertString(fs_1.readFileSync(testXMLFile, 'UTF-8'));
     assert.ok(node instanceof index_2.Node);
     assert.ok(node[0] instanceof index_2.Node);
-    assert.equal(node.length, 4);
+    assert.equal(node.length, 5);
 }));
 test('Convert stream', (assert) => __awaiter(this, void 0, void 0, function* () {
     assert.plan(3);
     const node = yield index_1.convertStream(fs_1.createReadStream(testXMLFile));
     assert.ok(node instanceof index_2.Node);
     assert.ok(node[0] instanceof index_2.Node);
-    assert.equal(node.length, 4);
+    assert.equal(node.length, 5);
 }));
 test('Query', (assert) => __awaiter(this, void 0, void 0, function* () {
-    assert.plan(2);
+    assert.plan(8);
     const node = yield index_1.convertStream(fs_1.createReadStream(testXMLFile));
     assert.equal(node.query('Foo').length, 3);
     assert.equal(node.query('ListTest')[0].query('Foo').length, 3);
+    assert.equal(node.query('/QueryTest').length, 1);
+    assert.equal(node.query('/QueryTest/A').length, 2);
+    assert.equal(node.query('/Unknown').length, 0);
+    assert.equal(node.query('B/A').length, 1);
+    assert.equal(node.query('B/C').length, 2);
+    assert.equal(node.query('A').length, 3);
 }));
 test('Text', (assert) => __awaiter(this, void 0, void 0, function* () {
     assert.plan(2);

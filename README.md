@@ -1,8 +1,8 @@
-## Install
+# Install
 
 Just run `npm i -S xml2o`
 
-## Usage
+# Usage
 
 Convert XML from stream:
 
@@ -25,7 +25,7 @@ const node = convertString('<node><foo bar="bar">foo</foo></node>');
 
 ```
 
-### Node
+## Node
 
 A node is a SimpleXML-like object which have some properties and methods
 to help you read XML structures.
@@ -76,11 +76,29 @@ console.log(...node.map(child => child.name));
 
 **Node query**
 ```typescript
-const [list] = node.query('list');
-console.log(...list);
+import {convertString} from 'xml2o';
+
+const xml = `<node>
+    <a/>
+    <b>
+        <a/>
+        <a/>
+        <c><a/></c>
+    </b>
+    <d>
+        <c><a/></c>
+    </d>
+</node>`;
+
+const node = convertString(xml);
+console.log(node.query('/a')); // found /node/a
+console.log(node.query('a')); // found /node/a, /node/b/a, /node/b/c/a, /node/d/c/a
+console.log(node.query('c/a')); // found /node/b/c/a, /node/d/c/a
+console.log(node.query('/d/c')); // found /node/d/c
+console.log(node.query('b/a')); // found /node/b/a
 ```
 
-#### Node Properties
+### Node Properties
 
 | Property | Description |
 |---|---|
@@ -91,7 +109,7 @@ console.log(...list);
 | `parent`      |  Parent Node
 | `root`        |  Root Node
 
-#### Node Methods
+### Node Methods
 
 | Method | Arguments | Description |
 |---|---|---|
@@ -101,9 +119,14 @@ console.log(...list);
 | `hasAttribute`    | `name, uri?`  | Returns true if an attribute is exists 
 | `query`           | `name, uri?`  | Returns matched nodes in any level
 
-## Note
-Code examples written in ES6 and modules so you may need babel, typescript or other.
-However you can code in ES3 with standard `requere` but promises required anyway.
+# Note
+Code examples written with modules so you may need babel, typescript or other to run its or rewrite ES6 imports to: 
 
-## License
+```js
+const createString = require('xml2o').createString;
+```
+
+This library written in ES6 and if you need ES3 build you can tell me i'll make support for older JS versions. 
+
+# License
 MIT

@@ -1,5 +1,5 @@
 import * as SAX from 'sax';
-import {Node} from './node';
+import {Node, Attribute} from './node';
 import ReadableStream = NodeJS.ReadableStream;
 
 interface CompatEvents {
@@ -53,3 +53,8 @@ export function convertString(XMLString: string): Promise<Node> {
     const parser = SAX.createStream(true, {xmlns: true});
     return convert(parser, () => parser.end(XMLString));
 }
+
+export {
+    Node,
+    Attribute
+};

@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const SAX = require("sax");
 const node_1 = require("./node");
+exports.Node = node_1.Node;
+exports.Attribute = node_1.Attribute;
 function convert(parser, ready) {
     let pointer = null;
     parser.on('opentag', node => {

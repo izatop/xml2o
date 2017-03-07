@@ -8,20 +8,20 @@ export class Node extends Array {
     public readonly path: string;
     public readonly prefix: string;
     public readonly uri: string;
-    
+
     protected readonly attributes: {[key: string]: Attribute};
-    
+
     constructor(opt: SAX.QualifiedTag, public parent: Node | null) {
         super();
         this.name = opt.name;
         this.local = opt.local;
         this.prefix = opt.prefix;
         this.uri = opt.uri || '';
-    
+
         this.attributes = Object.assign({}, ...Object.keys(opt.attributes).map(key => ({[key]: new Attribute(opt.attributes[key])})));
         this[text] = [];
     }
-    
+
     static pushText(node, value) {
         node[text].push(value);
         if (node.parent) {
@@ -42,7 +42,7 @@ export class Node extends Array {
                     const attribute = this.attributes[key];
                     return (uri && attribute.uri === uri) || (!uri && !attribute.uri)
                 })
-                .map(key => ({[key]: this.attributes[key].value}))
+                .map(key => ({[this.attributes[key].local]: this.attributes[key].value}))
         )
     }
 
@@ -81,11 +81,11 @@ export class Node extends Array {
         const result = [];
         const searchUri = uri || '';
         let match: {(node: Node): Node[]};
-        
+
         if (path === '/') {
             return [this];
         }
-        
+
         if (0 === path.indexOf('/')) {
             const parts = path.split('/').slice(1);
             if (parts.length === 1) {
@@ -101,11 +101,11 @@ export class Node extends Array {
         } else {
             match = (node) => path === node.local && searchUri === node.uri ? [node, ...node.query(path, uri)] : [...node.query(path, uri)];
         }
-    
+
         for (const node of this) {
             result.push(...match(node));
         }
-        
+
         return result;
     }
 }

@@ -29,7 +29,7 @@ class Node extends Array {
             const attribute = this.attributes[key];
             return (uri && attribute.uri === uri) || (!uri && !attribute.uri);
         })
-            .map(key => ({ [key]: this.attributes[key].value })));
+            .map(key => ({ [this.attributes[key].local]: this.attributes[key].value })));
     }
     getAttribute(name, uri) {
         return (this.getAttributeNode(name, uri) || { value: undefined }).value;

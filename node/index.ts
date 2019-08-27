@@ -2,7 +2,7 @@ import * as SAX from 'sax';
 
 const text = Symbol();
 
-export class Node extends Array {
+export class Node extends Array<Node> {
     [text]: string[];
 
     public readonly name: string;

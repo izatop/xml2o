@@ -9,8 +9,15 @@ class Node extends Array {
         this.local = opt.local;
         this.prefix = opt.prefix;
         this.uri = opt.uri || '';
-        this.attributes = Object.assign({}, ...Object.keys(opt.attributes).map(key => ({ [key]: new Attribute(opt.attributes[key]) })));
+        this.attributes = Object.assign({}, ...Object.keys(opt.attributes)
+            .map(key => ({ [key]: new Attribute(opt.attributes[key]) })));
         this[text] = [];
+    }
+    get root() {
+        return this.parent ? this.parent.root : this;
+    }
+    get text() {
+        return this[text].join('');
     }
     static pushText(node, value) {
         node[text].push(value);
@@ -32,29 +39,25 @@ class Node extends Array {
             .map(key => ({ [this.attributes[key].local]: this.attributes[key].value })));
     }
     getAttribute(name, uri) {
-        return (this.getAttributeNode(name, uri) || { value: undefined }).value;
+        const attribute = (this.getAttributeNode(name, uri) || { value: undefined });
+        if (attribute) {
+            return attribute.value;
+        }
     }
     getAttributeNode(name, uri) {
-        return Object.keys(this.attributes)
-            .filter(key => {
-            const attribute = this.attributes[key];
+        return Object.entries(this.attributes)
+            .filter(([, attribute]) => {
             if (name && uri) {
                 return name === attribute.local
                     && uri === attribute.uri;
             }
             return attribute.name === name;
         })
-            .map(key => this.attributes[key])
+            .map(([, attribute]) => attribute)
             .shift();
     }
     hasAttribute(name, uri) {
         return !!this.getAttributeNode(name, uri);
-    }
-    get root() {
-        return this.parent ? this.parent.root : this;
-    }
-    get text() {
-        return this[text].join('');
     }
     query(path, uri) {
         const result = [];

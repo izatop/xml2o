@@ -1,6 +1,8 @@
 import * as SAX from 'sax';
+declare const text: unique symbol;
 export declare class Node extends Array {
     parent: Node | null;
+    [text]: string[];
     readonly name: string;
     readonly local: string;
     readonly path: string;
@@ -10,14 +12,14 @@ export declare class Node extends Array {
         [key: string]: Attribute;
     };
     constructor(opt: SAX.QualifiedTag, parent: Node | null);
-    static pushText(node: any, value: any): void;
-    static addNode(parent: any, opt: SAX.QualifiedTag): Node;
+    readonly root: Node;
+    readonly text: string;
+    static pushText(node: Node, value: string): void;
+    static addNode(parent: Node, opt: SAX.QualifiedTag): Node;
     getAttributes(uri?: string): any;
-    getAttribute(name: string, uri?: string): string;
-    getAttributeNode(name: string, uri?: string): Attribute;
+    getAttribute(name: string, uri?: string): string | undefined;
+    getAttributeNode(name: string, uri?: string): Attribute | undefined;
     hasAttribute(name: string, uri?: string): boolean;
-    readonly root: any;
-    readonly text: any;
     query(path: string, uri?: string): Node[];
 }
 export declare class Attribute {
@@ -29,3 +31,4 @@ export declare class Attribute {
     constructor(opt: SAX.QualifiedAttribute);
     toString(): string;
 }
+export {};

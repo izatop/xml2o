@@ -3,13 +3,19 @@ import * as SAX from 'sax';
 const text = Symbol();
 
 export class Node extends Array {
+    [text]: string[];
+
     public readonly name: string;
+
     public readonly local: string;
-    public readonly path: string;
+
+    public readonly path!: string;
+
     public readonly prefix: string;
+
     public readonly uri: string;
 
-    protected readonly attributes: {[key: string]: Attribute};
+    protected readonly attributes: { [key: string]: Attribute };
 
     constructor(opt: SAX.QualifiedTag, public parent: Node | null) {
         super();
@@ -18,24 +24,37 @@ export class Node extends Array {
         this.prefix = opt.prefix;
         this.uri = opt.uri || '';
 
-        this.attributes = Object.assign({}, ...Object.keys(opt.attributes).map(key => ({[key]: new Attribute(opt.attributes[key])})));
+        this.attributes = Object.assign(
+            {},
+            ...Object.keys(opt.attributes)
+                .map(key => ({[key]: new Attribute(opt.attributes[key])})),
+        );
+
         this[text] = [];
     }
 
-    static pushText(node, value) {
+    public get root(): Node {
+        return this.parent ? this.parent.root : this;
+    }
+
+    public get text() {
+        return this[text].join('');
+    }
+
+    public static pushText(node: Node, value: string) {
         node[text].push(value);
         if (node.parent) {
             node.parent[text].push(value);
         }
     }
 
-    static addNode(parent, opt: SAX.QualifiedTag) {
+    public static addNode(parent: Node, opt: SAX.QualifiedTag) {
         const node = new Node(opt, parent);
         parent.push(node);
         return node;
     }
 
-    getAttributes(uri?: string) {
+    public getAttributes(uri?: string) {
         return Object.assign({},
             ...Object.keys(this.attributes)
                 .filter(key => {
@@ -46,14 +65,16 @@ export class Node extends Array {
         )
     }
 
-    getAttribute(name: string, uri?: string): string {
-        return (this.getAttributeNode(name, uri) || {value: undefined}).value;
+    public getAttribute(name: string, uri?: string): string | undefined {
+        const attribute = (this.getAttributeNode(name, uri) || {value: undefined});
+        if (attribute) {
+            return attribute.value;
+        }
     }
 
-    getAttributeNode(name: string, uri?: string): Attribute {
-        return Object.keys(this.attributes)
-            .filter(key => {
-                const attribute = this.attributes[key];
+    public getAttributeNode(name: string, uri?: string): Attribute | undefined {
+        return Object.entries(this.attributes)
+            .filter(([, attribute]) => {
                 if (name && uri) {
                     return name === attribute.local
                         && uri === attribute.uri;
@@ -61,26 +82,18 @@ export class Node extends Array {
 
                 return attribute.name === name;
             })
-            .map(key => this.attributes[key])
+            .map(([, attribute]) => attribute)
             .shift();
     }
 
-    hasAttribute(name: string, uri?: string): boolean {
+    public hasAttribute(name: string, uri?: string): boolean {
         return !!this.getAttributeNode(name, uri);
     }
 
-    get root() {
-        return this.parent ? this.parent.root : this;
-    }
-
-    get text() {
-        return this[text].join('');
-    }
-
-    query(path: string, uri?: string): Node[] {
+    public query(path: string, uri?: string): Node[] {
         const result = [];
         const searchUri = uri || '';
-        let match: {(node: Node): Node[]};
+        let match: { (node: Node): Node[] };
 
         if (path === '/') {
             return [this];
@@ -112,11 +125,15 @@ export class Node extends Array {
 
 
 export class Attribute {
-    readonly name: string;
-    readonly local: string;
-    readonly value: string;
-    readonly prefix: string;
-    readonly uri: string;
+    public readonly name: string;
+
+    public readonly local: string;
+
+    public readonly value: string;
+
+    public readonly prefix: string;
+
+    public readonly uri: string;
 
     constructor(opt: SAX.QualifiedAttribute) {
         this.value = opt.value;
@@ -126,7 +143,7 @@ export class Attribute {
         this.uri = opt.uri;
     }
 
-    toString() {
+    public toString() {
         return this.value;
     }
 }

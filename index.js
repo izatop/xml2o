@@ -5,7 +5,7 @@ const node_1 = require("./node");
 exports.Node = node_1.Node;
 exports.Attribute = node_1.Attribute;
 function convert(parser, ready) {
-    let pointer = null;
+    let pointer;
     parser.on('opentag', node => {
         if (!pointer) {
             pointer = new node_1.Node(node, null);

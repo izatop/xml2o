@@ -1,6 +1,6 @@
 import * as SAX from 'sax';
 declare const text: unique symbol;
-export declare class Node extends Array {
+export declare class Node extends Array<Node> {
     parent: Node | null;
     [text]: string[];
     readonly name: string;
@@ -12,8 +12,8 @@ export declare class Node extends Array {
         [key: string]: Attribute;
     };
     constructor(opt: SAX.QualifiedTag, parent: Node | null);
-    readonly root: Node;
-    readonly text: string;
+    get root(): Node;
+    get text(): string;
     static pushText(node: Node, value: string): void;
     static addNode(parent: Node, opt: SAX.QualifiedTag): Node;
     getAttributes(uri?: string): any;

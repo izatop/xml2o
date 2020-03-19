@@ -25,14 +25,14 @@
   },
   "homepage": "https://github.com/izatop/xml2o#readme",
   "devDependencies": {
-    "@types/tape": "^4.2.29",
-    "source-map-support": "^0.5.13",
-    "tape": "^4.6.3",
-    "typescript": "^3.5.3"
+    "@types/tape": "^4.2.34",
+    "source-map-support": "^0.5.16",
+    "tape": "^4.13.2",
+    "typescript": "^3.8.3"
   },
   "dependencies": {
-    "@types/node": "^12.7.2",
-    "@types/sax": "^1.0.0",
+    "@types/node": "^13.9.2",
+    "@types/sax": "^1.2.1",
     "sax": "^1.2.2"
   }
 }

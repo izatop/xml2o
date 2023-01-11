@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.Attribute = exports.Node = exports.convertString = exports.convertStream = void 0;
 const SAX = require("sax");
 const node_1 = require("./node");
-exports.Node = node_1.Node;
-exports.Attribute = node_1.Attribute;
+Object.defineProperty(exports, "Node", { enumerable: true, get: function () { return node_1.Node; } });
+Object.defineProperty(exports, "Attribute", { enumerable: true, get: function () { return node_1.Attribute; } });
 function convert(parser, ready) {
     let pointer;
     parser.on('opentag', node => {

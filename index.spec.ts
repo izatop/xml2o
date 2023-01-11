@@ -9,7 +9,7 @@ const trim = (t: string) => t.replace(/(^\s*|\s*$)/g, '');
 
 test('Convert string', async assert => {
     assert.plan(3);
-    const node = await convertString(readFileSync(testXMLFile, 'UTF-8'));
+    const node = await convertString(readFileSync(testXMLFile, 'utf-8'));
     assert.ok(node instanceof Node);
     assert.ok(node[0] instanceof Node);
     assert.equal(node.length, 5);

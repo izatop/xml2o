@@ -17,9 +17,6 @@ jobs:
         node-version: 18.16.0
         registry-url: 'https://registry.npmjs.org'
     - uses: fregante/setup-git-user@v2
-    - run: yarn
-    - run: yarn clean
-    - run: yarn build
-    - run: npm publish
+    - run: yarn && yarn clean && yarn build && yarn test && npm publish
       env:
         NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

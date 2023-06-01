@@ -1,10 +1,10 @@
-import {join} from 'path';
+import {dirname, join} from 'path';
 import {createReadStream, readFileSync} from 'fs';
 import {convertStream, convertString} from "./index";
 import * as test from 'tape';
 import {Attribute, Node} from "./node/index";
 
-const testXMLFile = join(__dirname, './index.spec.xml');
+const testXMLFile = join(dirname(__dirname), '/index.spec.xml');
 const trim = (t: string) => t.replace(/(^\s*|\s*$)/g, '');
 
 test('Convert string', async assert => {

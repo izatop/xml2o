@@ -1,12 +1,21 @@
 {
     "compilerOptions": {
         "target": "es6",
+        "incremental": true,
         "module": "commonjs",
         "sourceMap": true,
         "declaration": true,
         "newLine": "LF",
-        "strict": true
+        "strict": true,
+        "alwaysStrict": true,
+        "rootDir": "src",
+        "outDir": "dist",
+        "skipLibCheck": true,
+        "skipDefaultLibCheck": true
     },
+    "include": [
+        "src"
+    ],
     "exclude": [
         "node_modules"
     ]

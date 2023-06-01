@@ -11,7 +11,9 @@
   "scripts": {
     "clean": "rimraf dist",
     "build": "tsc",
-    "test": "tape dist/*.spec.js"
+    "test": "tape dist/*.spec.js",
+    "prepublishOnly": "yarn version",
+    "postpublish": "git push --tags"
   },
   "repository": {
     "type": "git",

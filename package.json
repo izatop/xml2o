@@ -1,6 +1,6 @@
 {
   "name": "xml2o",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "description": "Helps you convert XML into an object for easy reading.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

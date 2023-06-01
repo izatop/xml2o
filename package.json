@@ -1,6 +1,6 @@
 {
   "name": "xml2o",
-  "version": "0.4.6",
+  "version": "0.4.9",
   "description": "Helps you convert XML into an object for easy reading.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +12,7 @@
     "clean": "rimraf dist",
     "build": "tsc",
     "test": "tape dist/*.spec.js",
-    "prepublish": "yarn version patch",
+    "prepublishOnly": "yarn version patch",
     "postpublish": "git push && git push --tags"
   },
   "repository": {

@@ -10,6 +10,7 @@
 # common
 *.tsbuildinfo
 node_modules/
+dist/
 
 # auto-generated files
 yarn-*.log

@@ -20,3 +20,4 @@ npm-*.log
 
 # local
 .local/
+.worktrees/

@@ -1,4 +1,4 @@
-import type {QualifiedAttribute, QualifiedTag} from 'sax';
+import type { QualifiedAttribute, QualifiedTag } from "sax";
 
 const text = Symbol();
 
@@ -17,17 +17,21 @@ export class Node extends Array<Node> {
 
     protected readonly attributes: { [key: string]: Attribute };
 
-    constructor(opt: QualifiedTag, public parent: Node | null) {
+    constructor(
+        opt: QualifiedTag,
+        public parent: Node | null,
+    ) {
         super();
         this.name = opt.name;
         this.local = opt.local;
         this.prefix = opt.prefix;
-        this.uri = opt.uri || '';
+        this.uri = opt.uri || "";
 
         this.attributes = Object.assign(
             {},
-            ...Object.keys(opt.attributes)
-                .map(key => ({[key]: new Attribute(opt.attributes[key])})),
+            ...Object.keys(opt.attributes).map((key) => ({
+                [key]: new Attribute(opt.attributes[key]),
+            })),
         );
 
         this[text] = [];
@@ -38,7 +42,7 @@ export class Node extends Array<Node> {
     }
 
     public get text() {
-        return this[text].join('');
+        return this[text].join("");
     }
 
     public static pushText(node: Node, value: string) {
@@ -55,18 +59,19 @@ export class Node extends Array<Node> {
     }
 
     public getAttributes(uri?: string) {
-        return Object.assign({},
+        return Object.assign(
+            {},
             ...Object.keys(this.attributes)
-                .filter(key => {
+                .filter((key) => {
                     const attribute = this.attributes[key];
-                    return (uri && attribute.uri === uri) || (!uri && !attribute.uri)
+                    return (uri && attribute.uri === uri) || (!uri && !attribute.uri);
                 })
-                .map(key => ({[this.attributes[key].local]: this.attributes[key].value}))
-        )
+                .map((key) => ({ [this.attributes[key].local]: this.attributes[key].value })),
+        );
     }
 
     public getAttribute(name: string, uri?: string): string | undefined {
-        const attribute = (this.getAttributeNode(name, uri) || {value: undefined});
+        const attribute = this.getAttributeNode(name, uri) || { value: undefined };
         if (attribute) {
             return attribute.value;
         }
@@ -76,8 +81,7 @@ export class Node extends Array<Node> {
         return Object.entries(this.attributes)
             .filter(([, attribute]) => {
                 if (name && uri) {
-                    return name === attribute.local
-                        && uri === attribute.uri;
+                    return name === attribute.local && uri === attribute.uri;
                 }
 
                 return attribute.name === name;
@@ -92,27 +96,36 @@ export class Node extends Array<Node> {
 
     public query(path: string, uri?: string): Node[] {
         const result: Node[] = [];
-        const searchUri = uri || '';
+        const searchUri = uri || "";
         let match: { (node: Node): Node[] };
 
-        if (path === '/') {
+        if (path === "/") {
             return [this];
         }
 
-        if (0 === path.indexOf('/')) {
-            const parts = path.split('/').slice(1);
+        if (0 === path.indexOf("/")) {
+            const parts = path.split("/").slice(1);
             if (parts.length === 1) {
-                match = (node) => parts[0] === node.local && searchUri === node.uri ? [node] : [];
+                match = (node) => (parts[0] === node.local && searchUri === node.uri ? [node] : []);
             } else if (parts.length > 1) {
-                match = (node) => parts[0] === node.local ? [...node.query('/'.concat(parts.slice(1).join('/')), uri)] : [];
+                match = (node) =>
+                    parts[0] === node.local
+                        ? [...node.query("/".concat(parts.slice(1).join("/")), uri)]
+                        : [];
             } else {
                 return [];
             }
-        } else if (-1 !== path.indexOf('/')) {
-            const parts = path.split('/');
-            match = (node) => parts[0] === node.local ? [...node.query(parts.slice(1).join('/'), uri)] : [...node.query(path, uri)];
+        } else if (-1 !== path.indexOf("/")) {
+            const parts = path.split("/");
+            match = (node) =>
+                parts[0] === node.local
+                    ? [...node.query(parts.slice(1).join("/"), uri)]
+                    : [...node.query(path, uri)];
         } else {
-            match = (node) => path === node.local && searchUri === node.uri ? [node, ...node.query(path, uri)] : [...node.query(path, uri)];
+            match = (node) =>
+                path === node.local && searchUri === node.uri
+                    ? [node, ...node.query(path, uri)]
+                    : [...node.query(path, uri)];
         }
 
         for (const node of this) {
@@ -122,7 +135,6 @@ export class Node extends Array<Node> {
         return result;
     }
 }
-
 
 export class Attribute {
     public readonly name: string;

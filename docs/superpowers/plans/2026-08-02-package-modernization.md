@@ -509,12 +509,12 @@ Add npm, Bun, and Yarn commands. Use these API forms:
 
 ```typescript
 import { convertString } from "xml2o";
-const root = await convertString("<root><item id=\"1\">value</item></root>");
+const root = await convertString('<root><item id="1">value</item></root>');
 ```
 
 ```javascript
 const { convertString } = require("xml2o");
-const root = await convertString("<root><item id=\"1\">value</item></root>");
+const root = await convertString('<root><item id="1">value</item></root>');
 ```
 
 Remove the nonexistent `createString` name and every synchronous conversion

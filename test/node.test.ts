@@ -1,11 +1,11 @@
-import {describe, expect, test} from "bun:test";
-import {Attribute, convertString, Node} from "../src";
+import { describe, expect, test } from "bun:test";
+import { Attribute, convertString, Node } from "../src";
 
 const xml = [
     '<root type="thing" xmlns:test="urn:test" test:language="en">',
     '<group><item id="1">one</item><item id="2">two</item></group>',
     '<test:item id="3" test:code="three">namespaced</test:item>',
-    '</root>',
+    "</root>",
 ].join("");
 
 describe("nodes", () => {
@@ -29,8 +29,8 @@ describe("nodes", () => {
         const namespacedItem = node.query("item", "urn:test")[0]!;
         const id = item.getAttributeNode("id");
 
-        expect(node.getAttributes()).toEqual({type: "thing"});
-        expect(node.getAttributes("urn:test")).toEqual({language: "en"});
+        expect(node.getAttributes()).toEqual({ type: "thing" });
+        expect(node.getAttributes("urn:test")).toEqual({ language: "en" });
         expect(node.getAttribute("missing")).toBeUndefined();
         expect(item.getAttribute("id")).toBe("1");
         expect(namespacedItem.getAttribute("code", "urn:test")).toBe("three");

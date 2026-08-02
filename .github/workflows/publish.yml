@@ -2,21 +2,21 @@ name: Publish
 
 on:
   push:
-    tags: [ "v*" ]
+    tags: ["v*"]
 
 jobs:
   ci:
     runs-on: ubuntu-latest
     name: Publish
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - uses: actions/setup-node@v3
-      with:
-        node-version: 18.16.0
-        registry-url: 'https://registry.npmjs.org'
-    - uses: fregante/setup-git-user@v2
-    - run: yarn && yarn clean && yarn build && yarn test && npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.16.0
+          registry-url: "https://registry.npmjs.org"
+      - uses: fregante/setup-git-user@v2
+      - run: yarn && yarn clean && yarn build && yarn test && npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

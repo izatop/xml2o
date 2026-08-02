@@ -1,4 +1,4 @@
-import * as SAX from 'sax';
+import type {QualifiedAttribute, QualifiedTag} from 'sax';
 
 const text = Symbol();
 
@@ -17,7 +17,7 @@ export class Node extends Array<Node> {
 
     protected readonly attributes: { [key: string]: Attribute };
 
-    constructor(opt: SAX.QualifiedTag, public parent: Node | null) {
+    constructor(opt: QualifiedTag, public parent: Node | null) {
         super();
         this.name = opt.name;
         this.local = opt.local;
@@ -48,7 +48,7 @@ export class Node extends Array<Node> {
         }
     }
 
-    public static addNode(parent: Node, opt: SAX.QualifiedTag) {
+    public static addNode(parent: Node, opt: QualifiedTag) {
         const node = new Node(opt, parent);
         parent.push(node);
         return node;
@@ -91,7 +91,7 @@ export class Node extends Array<Node> {
     }
 
     public query(path: string, uri?: string): Node[] {
-        const result = [];
+        const result: Node[] = [];
         const searchUri = uri || '';
         let match: { (node: Node): Node[] };
 
@@ -135,7 +135,7 @@ export class Attribute {
 
     public readonly uri: string;
 
-    constructor(opt: SAX.QualifiedAttribute) {
+    constructor(opt: QualifiedAttribute) {
         this.value = opt.value;
         this.prefix = opt.prefix;
         this.name = opt.name;

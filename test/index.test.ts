@@ -17,4 +17,13 @@ describe("conversion", () => {
         expect(node.getAttribute("type")).toBe("thing");
         expect(node.text).toContain("onetwo");
     });
+
+    test("rejects malformed XML", async () => {
+        await expect(convertString("<root><item></root>")).rejects.toBeInstanceOf(Error);
+    });
+
+    test("collects text split across stream chunks", async () => {
+        const node = await convertStream(Readable.from(["<root>hel", "lo</root>"]));
+        expect(node.text).toBe("hello");
+    });
 });

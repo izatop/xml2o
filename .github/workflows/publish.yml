@@ -3,20 +3,32 @@ name: Publish
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Exact tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
-  ci:
+  publish:
     runs-on: ubuntu-latest
     name: Publish
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v3
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - run: bun ci
+      - name: Audit dependencies
+        run: bun run security
+      - run: bun run check
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 18.16.0
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
-      - uses: fregante/setup-git-user@v2
-      - run: yarn && yarn clean && yarn build && yarn test && npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+      - run: npm publish --provenance

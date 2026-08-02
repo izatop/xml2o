@@ -1,4 +1,4 @@
-import * as SAX from 'sax';
+import SAX from 'sax';
 import {Node, Attribute} from './node';
 import ReadableStream = NodeJS.ReadableStream;
 
@@ -33,7 +33,7 @@ function convert(parser: CompatEvents, ready: () => void): Promise<Node> {
         }
     });
 
-    parser.on('closetag', node => pointer.parent ? pointer = pointer.parent : null);
+    parser.on('closetag', _node => pointer.parent ? pointer = pointer.parent : null);
     parser.on('text', value => pointer && Node.pushText(pointer, value));
     parser.on('cdata', value => Node.pushText(pointer, value));
 

@@ -46,9 +46,10 @@ the required module object:
 const { convertString, Node } = require("xml2o");
 ```
 
-The migration will not add a default export. `sax` will remain an external
-runtime dependency instead of being bundled into the package. Type-only
-packages, including Node and Sax declarations, belong in `devDependencies`.
+The migration will not add a default export. `sax` will remain the package's
+only runtime dependency instead of being bundled. `@types/node` and `@types/sax`
+will move from `dependencies` to `devDependencies` and stay out of the published
+runtime dependency graph.
 
 ## Toolchain and Dependencies
 
@@ -155,6 +156,8 @@ automatic version-bump workflow.
   production source.
 - `bun run build` creates the CJS, ESM, source map, and declaration artifacts.
 - Packed ESM, CommonJS, and TypeScript consumers load the documented API.
+- The packed manifest lists `sax` as its only runtime dependency and keeps
+  `@types/node` and `@types/sax` in `devDependencies`.
 - `bun run check` passes from a clean checkout.
 - CI runs the audit and full check on pushes and pull requests.
 - Publish uses npm Trusted Publishing and no registry token secret.

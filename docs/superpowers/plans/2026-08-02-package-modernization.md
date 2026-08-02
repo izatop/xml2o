@@ -321,11 +321,6 @@ coveragePathIgnorePatterns = ["test/**"]
 coverageThreshold = { lines = 1.0, functions = 1.0, statements = 1.0 }
 ```
 
-**Known limitation (Bun 1.3.14):** coverage reports correctly, but configured
-thresholds did not return a non-zero status below target. Keep the 100%
-thresholds configured; CI must still require a visible 100% report until Bun
-fixes enforcement.
-
 - [ ] **Step 2: Run coverage and capture RED**
 
 Run:

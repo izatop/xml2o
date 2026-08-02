@@ -103,9 +103,10 @@ try {
         join(consumerNodeModules, "sax"),
         "dir",
     );
+    await mkdir(join(consumerNodeModules, "@types"));
     await symlink(
-        join(packageRoot, "node_modules", "@types"),
-        join(consumerNodeModules, "@types"),
+        join(packageRoot, "node_modules", "@types", "node"),
+        join(consumerNodeModules, "@types", "node"),
         "dir",
     );
 
@@ -124,7 +125,10 @@ try {
             "(async () => {",
             '    if (typeof Attribute !== "function" || typeof Node !== "function" || typeof convertStream !== "function" || typeof convertString !== "function") throw new Error("Missing CJS named export");',
             '    if (!(await convertString("<root />")) instanceof Node) throw new Error("CJS conversion did not return Node");',
-            "})();",
+            "})().catch((error) => {",
+            "    console.error(error);",
+            "    process.exitCode = 1;",
+            "});",
         ].join("\n"),
     );
     await writeFile(

@@ -1,4 +1,18 @@
-import type { QualifiedAttribute, QualifiedTag } from "sax";
+interface AttributeInput {
+    name: string;
+    local: string;
+    value: string;
+    prefix: string;
+    uri: string;
+}
+
+interface NodeInput {
+    name: string;
+    local: string;
+    prefix: string;
+    uri: string;
+    attributes: { [key: string]: AttributeInput };
+}
 
 const text = Symbol();
 
@@ -18,7 +32,7 @@ export class Node extends Array<Node> {
     protected readonly attributes: { [key: string]: Attribute };
 
     constructor(
-        opt: QualifiedTag,
+        opt: NodeInput,
         public parent: Node | null,
     ) {
         super();
@@ -52,7 +66,7 @@ export class Node extends Array<Node> {
         }
     }
 
-    public static addNode(parent: Node, opt: QualifiedTag) {
+    public static addNode(parent: Node, opt: NodeInput) {
         const node = new Node(opt, parent);
         parent.push(node);
         return node;
@@ -147,7 +161,7 @@ export class Attribute {
 
     public readonly uri: string;
 
-    constructor(opt: QualifiedAttribute) {
+    constructor(opt: AttributeInput) {
         this.value = opt.value;
         this.prefix = opt.prefix;
         this.name = opt.name;

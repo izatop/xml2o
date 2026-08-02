@@ -96,6 +96,11 @@ attributes, tree navigation, and query paths.
 functions, and statements for production code under `src`. Tests will use
 temporary files or in-memory streams and will close resources they create.
 
+**Known limitation (Bun 1.3.14):** coverage reports correctly, but configured
+thresholds did not return a non-zero status below target. Keep the 100%
+thresholds configured; CI must still require a visible 100% report until Bun
+fixes enforcement.
+
 The aggregate `bun run check` command will run formatting checks, linting,
 source and test typechecks, unit tests, the dual build, and the packed-package
 test.

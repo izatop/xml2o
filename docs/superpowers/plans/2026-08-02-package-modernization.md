@@ -307,7 +307,7 @@ git commit -m "build: type-check source with TypeScript 7"
 **Interfaces:**
 
 - Consumes: all public parser and tree APIs plus parser error propagation.
-- Produces: a Bun coverage gate of `1` for lines, functions, and statements.
+- Produces: a Bun coverage gate of `1.0` for lines, functions, and statements.
 
 - [ ] **Step 1: Enable the full source coverage gate**
 
@@ -318,8 +318,13 @@ Append to `bunfig.toml`:
 coverage = true
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = ["test/**"]
-coverageThreshold = { lines = 1, functions = 1, statements = 1 }
+coverageThreshold = { lines = 1.0, functions = 1.0, statements = 1.0 }
 ```
+
+**Known limitation (Bun 1.3.14):** coverage reports correctly, but configured
+thresholds did not return a non-zero status below target. Keep the 100%
+thresholds configured; CI must still require a visible 100% report until Bun
+fixes enforcement.
 
 - [ ] **Step 2: Run coverage and capture RED**
 

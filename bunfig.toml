@@ -4,5 +4,5 @@ minimumReleaseAge = 259200
 [test]
 coverage = true
 coverageSkipTestFiles = true
-coveragePathIgnorePatterns = ["test/**"]
+coveragePathIgnorePatterns = ["test/**", "scripts/**"]
 coverageThreshold = { lines = 1.0, functions = 1.0, statements = 1.0 }

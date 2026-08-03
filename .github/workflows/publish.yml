@@ -1,66 +1,153 @@
 name: Publish
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Exact tag to publish
-        required: true
-        type: string
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
+
+concurrency:
+  group: publish-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
-  resolve-release-tag:
+  prepare-release:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.resolve.outputs.tag }}
-    steps:
-      - id: resolve
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DISPATCH_TAG: ${{ inputs.tag }}
-          PUSH_TAG: ${{ github.ref_name }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            release_tag="$DISPATCH_TAG"
-          else
-            release_tag="$PUSH_TAG"
-          fi
-
-          if [ -z "$release_tag" ]; then
-            echo "A release tag is required" >&2
-            exit 1
-          fi
-
-          if ! git check-ref-format --allow-onelevel "refs/tags/$release_tag"; then
-            echo "Invalid release tag" >&2
-            exit 1
-          fi
-
-          case "$release_tag" in
-            v*) ;;
-            *)
-              echo "Release tag must begin with v" >&2
-              exit 1
-              ;;
-          esac
-
-          printf 'tag=%s\n' "$release_tag" >> "$GITHUB_OUTPUT"
-
-  publish:
-    needs: resolve-release-tag
-    runs-on: ubuntu-latest
-    name: Publish
+    permissions:
+      actions: write
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: refs/tags/${{ needs.resolve-release-tag.outputs.tag }}
+          ref: main
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - id: release
+        name: Resolve patch release
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_name="$(jq -er '.name' package.json)"
+          package_version="$(jq -er '.version' package.json)"
+          published_version="$(npm view "${package_name}@latest" version)"
+          release_version="$(bun scripts/release-version.ts next "$published_version")"
+          release_tag="v${release_version}"
+          tagged_version="-"
+
+          if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+            tagged_version="$(git show "${release_tag}:package.json" | jq -er '.version')"
+          fi
+
+          bun scripts/release-version.ts resolve \
+            "$package_version" \
+            "$published_version" \
+            "$tagged_version" >> "$GITHUB_OUTPUT"
+      - name: Validate and create release
+        if: steps.release.outputs.mode == 'prepare'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          npm version "$RELEASE_VERSION" --no-git-tag-version --ignore-scripts
+          bun ci
+          bun run security
+          bun run check
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "release: $RELEASE_TAG"
+          git tag --annotate "$RELEASE_TAG" --message "Release $RELEASE_TAG"
+          git push --atomic origin HEAD:refs/heads/main "refs/tags/$RELEASE_TAG"
+      - name: Verify tagged commit
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          release_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          git merge-base --is-ancestor "$release_sha" origin/main
+      - name: Start trusted publish run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -cn \
+            --arg ref "$RELEASE_TAG" \
+            '{ref: $ref}')"
+          curl --fail-with-body \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/dispatches" \
+            --data "$payload"
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - id: release-ref
+        name: Validate release ref
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid stable release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          if ! git check-ref-format "refs/tags/$RELEASE_TAG"; then
+            echo "Invalid Git tag ref: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          if ! [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid release commit SHA" >&2
+            exit 1
+          fi
+
+          printf 'tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          printf 'sha=%s\n' "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: refs/tags/${{ steps.release-ref.outputs.tag }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - name: Verify immutable release source
+        env:
+          RELEASE_SHA: ${{ steps.release-ref.outputs.sha }}
+          RELEASE_TAG: ${{ steps.release-ref.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          package_version="$(jq -er '.version' package.json)"
+
+          if [ "$actual_sha" != "$RELEASE_SHA" ] || [ "$tagged_sha" != "$RELEASE_SHA" ]; then
+            echo "Release tag and event SHA do not match" >&2
+            exit 1
+          fi
+          if [ "v$package_version" != "$RELEASE_TAG" ]; then
+            echo "Package version and release tag do not match" >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
       - run: bun ci
       - name: Audit dependencies
         run: bun run security

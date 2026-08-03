@@ -202,7 +202,7 @@ jobs:
           package_version="$(jq -er '.version' package.json)"
           metadata="$(npm view "$package_name" version versions --json)"
           registry_version="$(jq -er '.version | select(type == "string")' <<< "$metadata")"
-          candidate_exists="$(jq -er \
+          candidate_exists="$(jq -r \
             --arg version "$package_version" \
             '(.versions | if type == "array" then . else [.] end) | index($version) != null' \
             <<< "$metadata")"
@@ -244,6 +244,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
+          overwrite: true
 
   publish:
     needs: verify-release

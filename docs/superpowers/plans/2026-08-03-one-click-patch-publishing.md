@@ -347,312 +347,68 @@ git add scripts/release-version.ts test/release-version.test.ts bunfig.toml
 git commit -m "feat: add patch release version resolver"
 ```
 
-### Task 2: Replace Tag Input Publishing with the Two-Phase Workflow
+### Task 2: Implement and Harden the Input-Free Publish Workflow
 
 **Files:**
 
-- Create: `test/publish-workflow.test.ts`
 - Modify: `.github/workflows/publish.yml`
+- Create: `test/publish-workflow.test.ts`
+- Modify: `test/release-version.test.ts`
+- Modify: `scripts/release-version.ts`
+- Modify: `docs/superpowers/specs/2026-08-03-one-click-patch-publishing-design.md`
 
-**Interfaces:**
+**Workflow contract:**
 
-- Consumes Task 1 CLI commands `next` and `resolve`.
-- Produces input-free `workflow_dispatch` release preparation.
-- Produces an internal workflow dispatch on the immutable release tag, with no
-  inputs.
-- Produces an immutable-tag publish path with npm OIDC provenance.
+- A `validate-dispatch` job rejects every ref except `main` and stable
+  `vX.Y.Z` tags.
+- A write-scoped `prepare-release` job resolves a new patch or retry, requires
+  annotated release tags, validates a new candidate, and atomically pushes
+  `main` plus its tag before dispatching `publish.yml` on that tag.
+- A read-only `verify-release` job checks the tag, event SHA, `main`
+  reachability, package version, locked install, unfiltered audit, full package
+  checks, and current npm registry state. It then runs
+  `npm pack --ignore-scripts`, creates a SHA-256 file, and uploads both through
+  a full-SHA-pinned artifact action.
+- Only the artifact-only `publish` job has `id-token: write`. It has no
+  checkout or Bun step, verifies the downloaded SHA-256 file, and runs
+  `npm publish "$archive" --ignore-scripts --provenance`.
+- An already-published tagged version that is npm `latest` is an idempotent
+  tag-run success. An occupied non-latest candidate or any other registry
+  divergence fails.
+- Artifact upload uses `overwrite: true` so GitHub `Re-run all jobs` can
+  recover from a later transient failure.
+- No `NPM_TOKEN`, workflow input, tag-push trigger, or added package dependency
+  is allowed.
 
-- [ ] **Step 1: Write a failing workflow contract test**
+**Regression tests:**
 
-Create `test/publish-workflow.test.ts`:
-
-```typescript
-import { describe, expect, test } from "bun:test";
-
-const workflow = await Bun.file(
-    new URL("../.github/workflows/publish.yml", import.meta.url),
-).text();
-
-describe("Publish workflow", () => {
-    test("uses only an input-free workflow dispatch trigger", () => {
-        expect(workflow).toContain("workflow_dispatch:");
-        expect(workflow).not.toContain("repository_dispatch:");
-        expect(workflow).not.toContain("inputs:");
-        expect(workflow).not.toMatch(/^\s+push:\s*$/m);
-    });
-
-    test("serializes release preparation and publication", () => {
-        expect(workflow).toContain("group: publish-${{ github.repository }}");
-        expect(workflow).toContain("cancel-in-progress: false");
-    });
-
-    test("separates write and OIDC permissions", () => {
-        expect(workflow).toContain("permissions: {}");
-        expect(workflow.match(/contents: write/g) ?? []).toHaveLength(1);
-        expect(workflow.match(/actions: write/g) ?? []).toHaveLength(1);
-        expect(workflow.match(/id-token: write/g) ?? []).toHaveLength(1);
-    });
-
-    test("uses atomic refs and provenance without a registry token", () => {
-        expect(workflow).toContain(
-            'git push --atomic origin HEAD:refs/heads/main "refs/tags/$RELEASE_TAG"',
-        );
-        expect(workflow).toContain(
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/dispatches",
-        );
-        expect(workflow).toContain("RELEASE_SHA: ${{ github.sha }}");
-        expect(workflow).toContain("npm publish --provenance");
-        expect(workflow).not.toContain("NPM_TOKEN");
-    });
-});
-```
-
-- [ ] **Step 2: Run the workflow contract test and verify RED**
+The parsed-YAML contract tests assert job conditions, dependencies, exact
+job-scoped permissions, full-SHA action pins, annotated-tag checks, atomic push,
+registry revalidation, artifact handoff, and absence of repository execution in
+the OIDC job. A shell-level regression executes the absent-candidate jq filter
+under `set -euo pipefail` and requires successful output `false`; do not use
+`jq -e` for that boolean because jq assigns false exit status 1.
 
 Run:
 
 ```bash
-bun test test/publish-workflow.test.ts
-```
-
-Expected: FAIL because the current workflow has a tag-push trigger and a
-required `tag` input, and lacks concurrency, write-scoped preparation, and an
-atomic release push.
-
-- [ ] **Step 3: Implement the two-phase release and publish workflow**
-
-Replace `.github/workflows/publish.yml` with:
-
-```yaml
-name: Publish
-
-on:
-    workflow_dispatch:
-
-permissions: {}
-
-concurrency:
-    group: publish-${{ github.repository }}
-    cancel-in-progress: false
-
-jobs:
-    prepare-release:
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
-        permissions:
-            actions: write
-            contents: write
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-              with:
-                  ref: main
-                  fetch-depth: 0
-            - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-              with:
-                  node-version: 24
-            - id: release
-              name: Resolve patch release
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  package_name="$(jq -er '.name' package.json)"
-                  package_version="$(jq -er '.version' package.json)"
-                  published_version="$(npm view "${package_name}@latest" version)"
-                  release_version="$(bun scripts/release-version.ts next "$published_version")"
-                  release_tag="v${release_version}"
-                  tagged_version="-"
-
-                  if git show-ref --verify --quiet "refs/tags/$release_tag"; then
-                    tagged_version="$(git show "${release_tag}:package.json" | jq -er '.version')"
-                  fi
-
-                  bun scripts/release-version.ts resolve \
-                    "$package_version" \
-                    "$published_version" \
-                    "$tagged_version" >> "$GITHUB_OUTPUT"
-            - name: Validate and create release
-              if: steps.release.outputs.mode == 'prepare'
-              shell: bash
-              env:
-                  RELEASE_TAG: ${{ steps.release.outputs.tag }}
-                  RELEASE_VERSION: ${{ steps.release.outputs.version }}
-              run: |
-                  set -euo pipefail
-                  npm version "$RELEASE_VERSION" --no-git-tag-version --ignore-scripts
-                  bun ci
-                  bun run security
-                  bun run check
-
-                  git config user.name "github-actions[bot]"
-                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git add package.json
-                  git commit -m "release: $RELEASE_TAG"
-                  git tag --annotate "$RELEASE_TAG" --message "Release $RELEASE_TAG"
-                  git push --atomic origin HEAD:refs/heads/main "refs/tags/$RELEASE_TAG"
-            - name: Verify tagged commit
-              shell: bash
-              env:
-                  RELEASE_TAG: ${{ steps.release.outputs.tag }}
-              run: |
-                  set -euo pipefail
-                  release_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
-                  git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
-                  git merge-base --is-ancestor "$release_sha" origin/main
-            - name: Start trusted publish run
-              env:
-                  GITHUB_TOKEN: ${{ github.token }}
-                  RELEASE_TAG: ${{ steps.release.outputs.tag }}
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  payload="$(jq -cn \
-                    --arg ref "$RELEASE_TAG" \
-                    '{ref: $ref}')"
-                  curl --fail-with-body \
-                    --request POST \
-                    --header "Accept: application/vnd.github+json" \
-                    --header "Authorization: Bearer $GITHUB_TOKEN" \
-                    --header "X-GitHub-Api-Version: 2026-03-10" \
-                    "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/dispatches" \
-                    --data "$payload"
-
-    publish:
-        if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            id-token: write
-        steps:
-            - id: release-ref
-              name: Validate release ref
-              env:
-                  RELEASE_SHA: ${{ github.sha }}
-                  RELEASE_TAG: ${{ github.ref_name }}
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  if ! [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-                    echo "Invalid stable release tag: $RELEASE_TAG" >&2
-                    exit 1
-                  fi
-                  if ! git check-ref-format "refs/tags/$RELEASE_TAG"; then
-                    echo "Invalid Git tag ref: $RELEASE_TAG" >&2
-                    exit 1
-                  fi
-                  if ! [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-                    echo "Invalid release commit SHA" >&2
-                    exit 1
-                  fi
-
-                  printf 'tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-                  printf 'sha=%s\n' "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-              with:
-                  ref: refs/tags/${{ steps.release-ref.outputs.tag }}
-                  fetch-depth: 0
-            - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-            - name: Verify immutable release source
-              env:
-                  RELEASE_SHA: ${{ steps.release-ref.outputs.sha }}
-                  RELEASE_TAG: ${{ steps.release-ref.outputs.tag }}
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  actual_sha="$(git rev-parse HEAD)"
-                  tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
-                  package_version="$(jq -er '.version' package.json)"
-
-                  if [ "$actual_sha" != "$RELEASE_SHA" ] || [ "$tagged_sha" != "$RELEASE_SHA" ]; then
-                    echo "Release tag and event SHA do not match" >&2
-                    exit 1
-                  fi
-                  if [ "v$package_version" != "$RELEASE_TAG" ]; then
-                    echo "Package version and release tag do not match" >&2
-                    exit 1
-                  fi
-
-                  git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
-                  git merge-base --is-ancestor "$RELEASE_SHA" origin/main
-            - run: bun ci
-            - name: Audit dependencies
-              run: bun run security
-            - run: bun run check
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-              with:
-                  node-version: 24
-                  registry-url: "https://registry.npmjs.org"
-            - run: npm publish --provenance
-```
-
-- [ ] **Step 4: Run the focused workflow test and verify GREEN**
-
-Run:
-
-```bash
-bun test test/publish-workflow.test.ts
-bun run test:typecheck
-bun run fmt:check
-bun run lint
-```
-
-Expected: the workflow contract passes, all new TypeScript test files
-type-check, and YAML/TypeScript formatting and linting pass.
-
-- [ ] **Step 5: Run the complete package and security gates**
-
-Run:
-
-```bash
+bun test test/release-version.test.ts test/publish-workflow.test.ts
 bun run security
 bun run check
 git diff --check
 ```
 
-Expected: Bun reports no vulnerabilities; formatting, linting, both source
-typechecks, test typechecking, unit tests with 100% production coverage, dual
-build, and packed-package consumption all pass; Git reports no whitespace
-errors.
+Expected: resolver and workflow regressions pass, Bun reports no
+vulnerabilities, formatting/lint/typechecks/builds/package consumers pass with
+100% production source coverage, and Git reports no whitespace errors.
 
-- [ ] **Step 6: Inspect the workflow's dangerous boundaries**
+Do not run the workflow while implementing. Before the first operator-triggered
+release, confirm all of the following:
 
-Run:
-
-```bash
-rg -n "workflow_dispatch|actions: write|contents: write|id-token: write|git push --atomic|actions/workflows/publish.yml/dispatches|npm publish --provenance" .github/workflows/publish.yml
-rg -n "repository_dispatch|inputs:|NPM_TOKEN|^[[:space:]]+push:" .github/workflows/publish.yml
-```
-
-Expected: the first command shows the manual/tag dispatch trigger, exactly one
-Actions write permission, exactly one contents write permission, exactly one
-OIDC permission, the atomic push, the tag-ref dispatch endpoint, and provenance
-publishing. The second command exits with status 1 and no matches.
-
-- [ ] **Step 7: Commit the workflow implementation**
-
-```bash
-git add .github/workflows/publish.yml test/publish-workflow.test.ts
-git commit -m "ci: automate patch releases from publish button"
-```
-
-After this commit, stop without running the workflow. The implementation may be
-pushed after review, but first confirm GitHub Actions has read/write workflow
-permission and can update `main`, configure immutable existing `v*` tags, and
-confirm npm Trusted Publisher uses owner `izatop`, repository `xml2o`, and
-workflow filename `publish.yml`. The owner's first manual `Publish` run is the
-operation that creates and publishes `xml2o@0.4.14`.
-
-## Review Hardening Amendment
-
-The workflow implementation supersedes the earlier Task 2 code sample in these
-security-sensitive details:
-
-- unsupported manual refs fail explicitly;
-- release refs must be annotated tags, and repository rules must prevent
-  updates or deletion of existing `v*` tags;
-- a no-OIDC verification job runs Bun install, audit, checks, final npm state
-  validation, `npm pack --ignore-scripts`, and SHA-256 generation;
-- only a separate artifact-only job has `id-token: write`; it verifies the
-  digest and publishes with package scripts disabled;
-- npm Trusted Publisher's workflow field is `publish.yml`, not a repository
-  path.
+- GitHub Actions has read/write workflow permission and can update `main`;
+- a tag ruleset allows creation but prevents update or deletion of existing
+  `v*` tags;
+- npm Trusted Publisher uses owner `izatop`, repository `xml2o`, and
+  workflow filename `publish.yml` (filename only);
+- the first manual `Publish` run on `main` is the operation that creates and
+  publishes `xml2o@0.4.14`.

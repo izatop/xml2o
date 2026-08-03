@@ -8,6 +8,7 @@ interface WorkflowStep {
     name?: string;
     run?: string;
     uses?: string;
+    with?: Record<string, unknown>;
 }
 
 interface WorkflowJob {
@@ -68,11 +69,38 @@ describe("Publish workflow", () => {
         expect(verifyRun).toContain("bun run security");
         expect(verifyRun).toContain("bun run check");
         expect(verifyRun).toContain('npm view "$package_name" version versions --json');
+        expect(verifyRun).not.toContain('candidate_exists="$(jq -er');
         expect(verifyRun).toContain("publication");
         expect(verifyRun).toContain("npm pack --ignore-scripts --json");
         expect(verifyUses).toContain(
             "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
         );
+        const upload = steps("verify-release").find((step) =>
+            step.uses?.startsWith("actions/upload-artifact@"),
+        );
+        expect(upload?.with?.overwrite).toBe(true);
+    });
+
+    test("treats an absent registry candidate as a successful false value", () => {
+        const metadata = JSON.stringify({ version: "0.4.13", versions: ["0.4.13"] });
+        const result = Bun.spawnSync([
+            "bash",
+            "-c",
+            String.raw`set -euo pipefail
+metadata="$1"
+package_version="$2"
+candidate_exists="$(jq -r \
+    --arg version "$package_version" \
+    '(.versions | if type == "array" then . else [.] end) | index($version) != null' \
+    <<< "$metadata")"
+printf '%s\n' "$candidate_exists"`,
+            "registry-candidate-test",
+            metadata,
+            "0.4.14",
+        ]);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout.toString()).toBe("false\n");
     });
 
     test("publishes only the verified artifact without repository scripts", () => {

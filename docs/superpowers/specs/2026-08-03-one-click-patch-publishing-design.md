@@ -23,22 +23,25 @@ will not be an alternative publish trigger.
 
 ## Architecture
 
-One workflow file has two event-driven phases:
+One workflow file has two `workflow_dispatch` phases distinguished by the ref:
 
-1. A `workflow_dispatch` run prepares the release on `main` and sends a
-   `repository_dispatch` event after the release commit and tag are on GitHub.
-2. A `repository_dispatch` run checks out that exact tag, verifies it again,
-   and publishes it with npm OIDC provenance.
+1. A manual run on `main` prepares the release and dispatches the same workflow
+   on the new release tag after the release commit and tag are on GitHub.
+2. The internally dispatched tag run checks out that exact tag, verifies it
+   again, and publishes it with npm OIDC provenance.
 
 The phases cannot rely on a tag push alone. GitHub does not start another
-workflow from a tag pushed with the repository's `GITHUB_TOKEN`. An explicit
-`repository_dispatch` creates the separate trusted publish run while keeping
-credentials inside GitHub Actions.
+workflow from a tag pushed with the repository's `GITHUB_TOKEN`. The prepare
+job instead calls GitHub's workflow-dispatch API with `ref` set to the release
+tag. `workflow_dispatch` is allowed to create another run when authenticated by
+`GITHUB_TOKEN`, and the tag ref makes `GITHUB_REF` and `GITHUB_SHA` identify the
+exact release source used by npm provenance.
 
 Workflow-level concurrency uses one group per repository with
-`cancel-in-progress: false`. A second button click or the internally dispatched
-publish run waits for the active release run instead of racing version
-selection or being cancelled.
+`cancel-in-progress: false`. Only one run can actively select, prepare, or
+publish a version. GitHub may replace a redundant pending run with a newer run
+in the same concurrency group; the retry state ensures that the surviving run
+resumes the existing tag instead of skipping a patch.
 
 ## Version Selection
 
@@ -72,8 +75,8 @@ package dependency.
 
 ## Prepare Phase
 
-The prepare job runs only for `workflow_dispatch` and receives
-`contents: write`. It will:
+The prepare job runs only for `workflow_dispatch` on `main` and receives
+`contents: write` plus `actions: write`. It will:
 
 1. Check out the current default `main` with complete tag history.
 2. Install the pinned Bun toolchain and Node 24.
@@ -85,13 +88,13 @@ The prepare job runs only for `workflow_dispatch` and receives
    `bun run check` against the exact candidate tree.
 6. Create a release commit named `release: v$N` and an annotated `v$N` tag.
 7. Atomically push the release commit to `main` together with the tag.
-8. Send `repository_dispatch` type `publish-package` with the immutable tag and
-   tagged commit SHA in `client_payload`.
+8. Call the workflow-dispatch API for `.github/workflows/publish.yml` with the
+   immutable release tag as `ref` and no inputs.
 
 In retry mode the job does not rewrite `package.json`, create another commit,
 move a tag, or validate a later mutable `main` tree as if it were the release.
-It verifies the existing tag and dispatches its existing SHA; the publish phase
-then runs the full checks against that immutable tag.
+It verifies the existing tag and dispatches the workflow on that tag ref; the
+publish phase then runs the full checks against the same immutable tag.
 
 The atomic push prevents a remote state containing only the commit or only the
 tag. If validation, version resolution, or the push fails, npm is not called.
@@ -100,22 +103,24 @@ retry mode and resumes from the existing tag.
 
 ## Publish Phase
 
-The publish job runs only for `repository_dispatch` type `publish-package`. It
-receives `contents: read` and `id-token: write`, but not `contents: write`. It
-will:
+The publish job runs only for `workflow_dispatch` on a stable `vX.Y.Z` tag. It
+receives `contents: read` and `id-token: write`, but not `contents: write` or
+`actions: write`. It will:
 
-1. Validate the payload's tag syntax and full commit SHA.
+1. Validate `github.ref_name` as a stable release tag and `github.sha` as a full
+   commit SHA.
 2. Check out `refs/tags/$TAG` with sufficient history.
-3. Verify that the tag resolves to the payload SHA, that the commit is reachable
+3. Verify that the tag resolves to `github.sha`, that the commit is reachable
    from `main`, and that `package.json` exactly matches the tag version.
 4. Run `bun ci`, `bun run security`, and `bun run check` again on the immutable
    release source.
 5. Set up Node 24 for the npm registry and run
    `npm publish --provenance` through npm Trusted Publishing.
 
-The second verification is intentional: the provenance-bearing job publishes
-the exact tagged source, independent of the mutable checkout used while
-preparing it. No `NPM_TOKEN` secret is introduced.
+The second verification is intentional: the provenance-bearing job's event
+ref, event SHA, and checked-out source all identify the same immutable tag,
+independent of the mutable checkout used while preparing it. No `NPM_TOKEN`
+secret is introduced.
 
 ## Failure and Recovery
 
@@ -128,13 +133,15 @@ preparing it. No `NPM_TOKEN` secret is introduced.
   clicking `Publish` again retries that version.
 - Repository and npm versions diverge beyond the single pending patch: the run
   reports the observed versions and exits without changing refs.
-- Concurrent clicks: the repository concurrency group serializes them.
+- Concurrent clicks: the repository concurrency group prevents overlapping
+  mutation; if GitHub replaces a redundant pending run, the surviving run uses
+  the same pending patch state.
 
-The GitHub repository must allow Actions to use a read/write `GITHUB_TOKEN` and
-must permit that token to update `main`. npm Trusted Publisher configuration
-must name this repository and `.github/workflows/publish.yml`. Missing repository
-or npm permissions produce a visible failed run without choosing another
-version.
+The GitHub repository must allow Actions to use a read/write `GITHUB_TOKEN`,
+including `actions: write`, and must permit that token to update `main`. npm
+Trusted Publisher configuration must name this repository and
+`.github/workflows/publish.yml`. Missing repository or npm permissions produce a
+visible failed run without choosing another version.
 
 ## Tests and Verification
 

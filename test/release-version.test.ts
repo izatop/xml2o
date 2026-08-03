@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { incrementPatch, resolveRelease } from "../scripts/release-version";
+import { incrementPatch, resolvePublication, resolveRelease } from "../scripts/release-version";
 
 const script = fileURLToPath(new URL("../scripts/release-version.ts", import.meta.url));
 
@@ -93,6 +93,58 @@ describe("resolveRelease", () => {
     });
 });
 
+describe("resolvePublication", () => {
+    test("publishes the next absent patch", () => {
+        expect(
+            resolvePublication({
+                packageVersion: "0.4.14",
+                registryVersion: "0.4.13",
+                candidateExists: false,
+            }),
+        ).toEqual({ publishRequired: true });
+    });
+
+    test("treats an already published tagged version as an idempotent retry", () => {
+        expect(
+            resolvePublication({
+                packageVersion: "0.4.14",
+                registryVersion: "0.4.14",
+                candidateExists: true,
+            }),
+        ).toEqual({ publishRequired: false });
+    });
+
+    test("rejects an occupied candidate that is not latest", () => {
+        expect(() =>
+            resolvePublication({
+                packageVersion: "0.4.14",
+                registryVersion: "0.4.13",
+                candidateExists: true,
+            }),
+        ).toThrow("Cannot publish 0.4.14: version already exists but npm latest is 0.4.13");
+    });
+
+    test("rejects registry metadata that omits its latest version", () => {
+        expect(() =>
+            resolvePublication({
+                packageVersion: "0.4.14",
+                registryVersion: "0.4.14",
+                candidateExists: false,
+            }),
+        ).toThrow("Registry inconsistency: latest 0.4.14 is missing from published versions");
+    });
+
+    test("rejects a package version unrelated to npm latest", () => {
+        expect(() =>
+            resolvePublication({
+                packageVersion: "0.4.15",
+                registryVersion: "0.4.13",
+                candidateExists: false,
+            }),
+        ).toThrow("Publication divergence: package.json=0.4.15, npm=0.4.13, expected patch=0.4.14");
+    });
+});
+
 describe("release-version CLI", () => {
     test("prints a GitHub output-compatible prepare decision", () => {
         const result = Bun.spawnSync(["bun", script, "resolve", "0.4.13", "0.4.13", "-"]);
@@ -106,5 +158,12 @@ describe("release-version CLI", () => {
 
         expect(result.exitCode).toBe(1);
         expect(result.stderr.toString()).toContain("Version divergence");
+    });
+
+    test("prints a GitHub output-compatible publication decision", () => {
+        const result = Bun.spawnSync(["bun", script, "publication", "0.4.14", "0.4.13", "false"]);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout.toString()).toBe("publish-required=true\n");
     });
 });

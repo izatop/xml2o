@@ -12,6 +12,16 @@ export interface ReleaseDecision {
     tag: string;
 }
 
+export interface PublicationInput {
+    packageVersion: string;
+    registryVersion: string;
+    candidateExists: boolean;
+}
+
+export interface PublicationDecision {
+    publishRequired: boolean;
+}
+
 function parseStableVersion(
     version: string,
     source: "npm" | "package.json",
@@ -62,6 +72,35 @@ export function resolveRelease(input: ReleaseInput): ReleaseDecision {
     );
 }
 
+export function resolvePublication(input: PublicationInput): PublicationDecision {
+    parseStableVersion(input.packageVersion, "package.json");
+    const expectedPatch = incrementPatch(input.registryVersion);
+
+    if (input.packageVersion === input.registryVersion) {
+        if (!input.candidateExists) {
+            throw new Error(
+                `Registry inconsistency: latest ${input.registryVersion} is missing from published versions`,
+            );
+        }
+
+        return { publishRequired: false };
+    }
+
+    if (input.packageVersion === expectedPatch) {
+        if (input.candidateExists) {
+            throw new Error(
+                `Cannot publish ${input.packageVersion}: version already exists but npm latest is ${input.registryVersion}`,
+            );
+        }
+
+        return { publishRequired: true };
+    }
+
+    throw new Error(
+        `Publication divergence: package.json=${input.packageVersion}, npm=${input.registryVersion}, expected patch=${expectedPatch}`,
+    );
+}
+
 function requireArguments(command: string, values: string[], count: number): void {
     if (values.length !== count) {
         throw new Error(
@@ -92,7 +131,21 @@ function runCli(arguments_: string[]): void {
         return;
     }
 
-    throw new Error("Usage: release-version.ts next|resolve");
+    if (command === "publication") {
+        requireArguments(command, values, 3);
+        if (values[2] !== "true" && values[2] !== "false") {
+            throw new Error("Usage error: publication candidate-exists must be true or false");
+        }
+        const decision = resolvePublication({
+            packageVersion: values[0],
+            registryVersion: values[1],
+            candidateExists: values[2] === "true",
+        });
+        process.stdout.write(`publish-required=${decision.publishRequired}\n`);
+        return;
+    }
+
+    throw new Error("Usage: release-version.ts next|resolve|publication");
 }
 
 if (import.meta.main) {

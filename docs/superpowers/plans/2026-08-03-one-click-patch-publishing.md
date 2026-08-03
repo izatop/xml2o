@@ -12,8 +12,9 @@ prepared but unpublished patch.
 **Architecture:** A dependency-free TypeScript helper owns stable SemVer patch
 selection and the prepare-versus-retry state machine. One GitHub Actions
 workflow uses that helper during a write-scoped manual run, atomically pushes a
-release commit and tag, then dispatches the same workflow on that tag for a
-separate read/OIDC-scoped publish run whose event SHA matches the release.
+release commit and tag, then dispatches the same workflow on that tag. A
+read-only job verifies and packs the exact release; a separate artifact-only
+job receives OIDC and publishes it.
 
 **Tech Stack:** Bun 1.3.14, TypeScript 7.0.2, `bun:test`, Bash, Git, GitHub
 Actions, Node.js 24, npm Trusted Publishing, GitHub REST API.
@@ -38,9 +39,13 @@ Actions, Node.js 24, npm Trusted Publishing, GitHub REST API.
 - Prevent overlapping manual and dispatched runs with one concurrency group and
   `cancel-in-progress: false`; retry the same tag if GitHub replaces a redundant
   pending run.
-- Give `contents: write` and `actions: write` only to release preparation and
-  `id-token: write` only to publication.
-- Publish with `npm publish --provenance` and never use `NPM_TOKEN`.
+- Give `contents: write` and `actions: write` only to release preparation.
+  Keep verification and package scripts outside the job with
+  `id-token: write`.
+- Revalidate npm immediately before packing. Publish only the absent next patch;
+  treat an already-published latest version as an idempotent retry.
+- Publish the checksummed package artifact with
+  `npm publish --ignore-scripts --provenance` and never use `NPM_TOKEN`.
 - Keep GitHub Action references pinned to full commit hashes.
 - Add no production, development, or release-management package dependency.
 - Do not change `xml2o`'s package version, create a release tag, or invoke the
@@ -632,6 +637,22 @@ git commit -m "ci: automate patch releases from publish button"
 
 After this commit, stop without running the workflow. The implementation may be
 pushed after review, but first confirm GitHub Actions has read/write workflow
-permission and can update `main`, and confirm npm Trusted Publisher names
-`izatop/xml2o` and `.github/workflows/publish.yml`. The owner's first manual
-`Publish` run is the operation that creates and publishes `xml2o@0.4.14`.
+permission and can update `main`, configure immutable existing `v*` tags, and
+confirm npm Trusted Publisher uses owner `izatop`, repository `xml2o`, and
+workflow filename `publish.yml`. The owner's first manual `Publish` run is the
+operation that creates and publishes `xml2o@0.4.14`.
+
+## Review Hardening Amendment
+
+The workflow implementation supersedes the earlier Task 2 code sample in these
+security-sensitive details:
+
+- unsupported manual refs fail explicitly;
+- release refs must be annotated tags, and repository rules must prevent
+  updates or deletion of existing `v*` tags;
+- a no-OIDC verification job runs Bun install, audit, checks, final npm state
+  validation, `npm pack --ignore-scripts`, and SHA-256 generation;
+- only a separate artifact-only job has `id-token: write`; it verifies the
+  digest and publishes with package scripts disabled;
+- npm Trusted Publisher's workflow field is `publish.yml`, not a repository
+  path.

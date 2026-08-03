@@ -27,8 +27,9 @@ One workflow file has two `workflow_dispatch` phases distinguished by the ref:
 
 1. A manual run on `main` prepares the release and dispatches the same workflow
    on the new release tag after the release commit and tag are on GitHub.
-2. The internally dispatched tag run checks out that exact tag, verifies it
-   again, and publishes it with npm OIDC provenance.
+2. The internally dispatched tag run checks out that exact tag, verifies and
+   packs it without OIDC access, then hands the checksummed package artifact to
+   a minimal npm OIDC publish job.
 
 The phases cannot rely on a tag push alone. GitHub does not start another
 workflow from a tag pushed with the repository's `GITHUB_TOKEN`. The prepare
@@ -67,11 +68,14 @@ button click republishes the same tag instead of skipping to the next patch.
 If npm cannot return the current published version, the workflow stops rather
 than guessing. It does not bootstrap an unpublished package.
 
-A small dependency-free script will implement strict version parsing and this
-decision table. The workflow will pass explicit inputs to it and consume a
-machine-readable result. This isolates the version policy from GitHub Actions
-orchestration and makes the important cases unit-testable without adding a
-package dependency.
+A small dependency-free script implements strict version parsing, this decision
+table, and the final publication policy. The tag run re-reads npm immediately
+before packing. It publishes only when the tagged version is exactly one patch
+above `latest` and is absent from the published version list. If that version
+is already `latest`, the retry succeeds without publishing again. Every other
+registry relationship fails. This isolates the version policy from GitHub
+Actions orchestration and makes the important cases unit-testable without
+adding a package dependency.
 
 ## Prepare Phase
 
@@ -101,26 +105,30 @@ tag. If validation, version resolution, or the push fails, npm is not called.
 If the dispatch call fails after a successful push, the next button click enters
 retry mode and resumes from the existing tag.
 
-## Publish Phase
+## Verify and Publish Phase
 
-The publish job runs only for `workflow_dispatch` on a stable `vX.Y.Z` tag. It
-receives `contents: read` and `id-token: write`, but not `contents: write` or
-`actions: write`. It will:
+The tag dispatch first runs a verification job with `contents: read` and no
+OIDC permission. It will:
 
 1. Validate `github.ref_name` as a stable release tag and `github.sha` as a full
    commit SHA.
-2. Check out `refs/tags/$TAG` with sufficient history.
+2. Check out `refs/tags/$TAG` with sufficient history and require an annotated
+   Git tag object.
 3. Verify that the tag resolves to `github.sha`, that the commit is reachable
    from `main`, and that `package.json` exactly matches the tag version.
 4. Run `bun ci`, `bun run security`, and `bun run check` again on the immutable
    release source.
-5. Set up Node 24 for the npm registry and run
-   `npm publish --provenance` through npm Trusted Publishing.
+5. Re-read npm's latest and complete version list and apply the strict
+   publication policy above.
+6. If publication is required, create a package using
+   `npm pack --ignore-scripts`, record its SHA-256 digest, and upload both as a
+   short-lived workflow artifact.
 
-The second verification is intentional: the provenance-bearing job's event
-ref, event SHA, and checked-out source all identify the same immutable tag,
-independent of the mutable checkout used while preparing it. No `NPM_TOKEN`
-secret is introduced.
+A separate minimal job receives `actions: read` and `id-token: write`. It does
+not check out repository code, install dependencies, run Bun, or execute package
+scripts. It downloads the verified artifact, checks the SHA-256 digest, and
+runs `npm publish "$archive" --ignore-scripts --provenance` through npm Trusted
+Publishing. No `NPM_TOKEN` secret is introduced.
 
 ## Failure and Recovery
 
@@ -129,8 +137,11 @@ secret is introduced.
 - The atomic push fails: neither remote ref should change, and the run fails.
 - Dispatch fails after the push: the release commit and tag remain; clicking
   `Publish` again retries that version.
-- Verification or npm fails after the push: the release commit and tag remain;
-  clicking `Publish` again retries that version.
+- Verification, artifact transfer, or npm fails after the push: the release
+  commit and tag remain; clicking `Publish` again retries that version.
+- The tagged version was published but the tag run lost its final response:
+  rerunning that tag verifies that it is already npm `latest` and exits
+  successfully without trying to publish the immutable version again.
 - Repository and npm versions diverge beyond the single pending patch: the run
   reports the observed versions and exits without changing refs.
 - Concurrent clicks: the repository concurrency group prevents overlapping
@@ -138,10 +149,15 @@ secret is introduced.
   the same pending patch state.
 
 The GitHub repository must allow Actions to use a read/write `GITHUB_TOKEN`,
-including `actions: write`, and must permit that token to update `main`. npm
-Trusted Publisher configuration must name this repository and
-`.github/workflows/publish.yml`. Missing repository or npm permissions produce a
-visible failed run without choosing another version.
+including `actions: write`, and must permit that token to update `main` and
+create `v*` tags. A tag ruleset must prevent updates and deletion of existing
+`v*` tags while still allowing the workflow to create new tags.
+
+npm Trusted Publisher configuration must use owner `izatop`, repository
+`xml2o`, and workflow filename `publish.yml` (the npm field accepts the
+filename only, not `.github/workflows/publish.yml`). It must allow npm
+publication. Missing repository or npm permissions produce a visible failed run
+without choosing another version.
 
 ## Tests and Verification
 
@@ -152,12 +168,15 @@ Unit tests for the version resolver will cover at least:
 - version divergence;
 - missing or mismatched retry tag;
 - malformed and prerelease versions;
-- patch increment without numeric coercion errors.
+- patch increment without numeric coercion errors;
+- next-patch publication, already-published idempotency, and registry
+  divergence.
 
 Repository verification will also check workflow formatting, shell syntax where
 applicable, and the existing full package checks. The implemented workflow will
 be inspected to confirm that the manual trigger has no inputs, permissions are
-job-scoped, pushes are atomic, and only the publish phase receives OIDC access.
+job-scoped, pushes are atomic, package verification runs without OIDC, and only
+the artifact-only publish job receives OIDC access.
 
 End-to-end publication is intentionally initiated by the operator after the
 workflow change reaches `main`. A successful first run must leave all of these
